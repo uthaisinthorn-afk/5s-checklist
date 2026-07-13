@@ -82,6 +82,13 @@
   .search-item .name{font-weight:600;font-size:14px;}
   .search-item .meta{font-size:12px;color:var(--muted);}
 
+  .floor-filter{margin-bottom:10px;}
+  .floor-filter label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .floor-filter select{
+    width:100%;padding:11px 12px;border:1px solid var(--line);
+    border-radius:10px;font-family:inherit;font-size:15px;background:#fff;color:var(--ink);
+  }
+
   .room-card{
     background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 100%);
     color:#fff;
@@ -323,11 +330,38 @@ function init(){
   }
 }
 
+function floorSortKey(f){
+  if (f === "Roof") return 1000;
+  if (f === "M") return 0.5;
+  if (/^B\d+$/.test(f)) return -parseInt(f.slice(1), 10);
+  const n = parseInt(f, 10);
+  return isNaN(n) ? -9999 : n;
+}
+function floorLabel(f){
+  if (f === "Roof") return "ดาดฟ้า (Roof)";
+  if (f === "M") return "ชั้น M (Mezzanine)";
+  if (/^B/.test(f)) return "ชั้น "+f+" (ใต้ดิน)";
+  return "ชั้น "+f;
+}
+function getFloorList(){
+  const floors = Array.from(new Set(ROOMS.map(r => r.floor)));
+  floors.sort((a,b) => floorSortKey(b) - floorSortKey(a));
+  return floors;
+}
+
 function renderPicker(){
   const app = document.getElementById("app");
+  const floors = getFloorList();
   app.innerHTML = `
     <div class="picker-box">
       <h2>เลือกห้องที่จะตรวจ</h2>
+      <div class="floor-filter">
+        <label>เลือกชั้น</label>
+        <select id="floorFilter">
+          <option value="">-- ทุกชั้น --</option>
+          ${floors.map(f => `<option value="${f}">${floorLabel(f)}</option>`).join("")}
+        </select>
+      </div>
       <input type="text" id="searchInput" placeholder="พิมพ์ชื่อห้อง เช่น ห้องไฟฟ้า, Chiller, ชั้น 5 ...">
       <div class="search-results" id="searchResults"></div>
     </div>
@@ -335,9 +369,10 @@ function renderPicker(){
     <div class="empty-hint"><a class="dash-link" style="color:var(--muted)" href="${CONFIG.DASHBOARD_PATH}">← กลับไปหน้าแดชบอร์ด</a></div>
   `;
   const input = document.getElementById("searchInput");
+  const floorSelect = document.getElementById("floorFilter");
   const resultsEl = document.getElementById("searchResults");
   function renderResults(list){
-    resultsEl.innerHTML = list.slice(0,40).map(r => `
+    resultsEl.innerHTML = list.slice(0,60).map(r => `
       <div class="search-item" data-id="${r.id}">
         <div>
           <div class="name">${r.name}</div>
@@ -353,12 +388,17 @@ function renderPicker(){
       });
     });
   }
-  renderResults(ROOMS);
-  input.addEventListener("input", ()=>{
+  function applyFilter(){
     const q = input.value.trim().toLowerCase();
-    const list = q ? ROOMS.filter(r => (r.name+" "+r.floor+" "+r.zone).toLowerCase().includes(q)) : ROOMS;
+    const floorVal = floorSelect.value;
+    let list = ROOMS;
+    if (floorVal) list = list.filter(r => r.floor === floorVal);
+    if (q) list = list.filter(r => (r.name+" "+r.floor+" "+r.zone).toLowerCase().includes(q));
     renderResults(list);
-  });
+  }
+  renderResults(ROOMS);
+  input.addEventListener("input", applyFilter);
+  floorSelect.addEventListener("change", applyFilter);
 }
 
 function toggleGroup(key, value, reasonNeeded){
