@@ -244,13 +244,36 @@ function setToday(){
 async function loadData(){
   const date = document.getElementById("dateInput").value;
   document.getElementById("todayBtn").classList.toggle("active", date === todayStr());
+
+  // แสดงสถานะ "กำลังโหลด" ทันที กันสับสนว่าข้อมูลว่างจริงๆ
+  document.getElementById("stats").innerHTML = `
+    <div class="stat" style="grid-column:1/-1;">
+      <div class="num" style="font-size:16px;color:var(--muted);">⏳ กำลังโหลดข้อมูล...</div>
+      <div class="lbl">ถ้า Apps Script แออุด อาจใช้เวลาถึง 15 วินาที</div>
+    </div>
+  `;
+
+  const TIMEOUT_MS = 15000; // 15 วินาที — ถ้าเกินนี้ถือว่าช้าเกินไป ไม่รอต่อ
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), TIMEOUT_MS);
+
   try{
     const url = CONFIG.GAS_URL + "?action=records&date=" + encodeURIComponent(date);
-    const resp = await fetch(url);
+    const resp = await fetch(url, { signal: controller.signal });
     currentRecords = await resp.json();
+    clearTimeout(timeoutId);
   }catch(e){
-    currentRecords = [];
+    clearTimeout(timeoutId);
+    currentRecords = null; // null = โหลดไม่สำเร็จ (ต่างจาก [] ที่แปลว่าโหลดสำเร็จแต่ไม่มีข้อมูล)
     console.error("โหลดข้อมูลไม่สำเร็จ", e);
+    document.getElementById("stats").innerHTML = `
+      <div class="stat" style="grid-column:1/-1;">
+        <div class="num" style="font-size:16px;color:var(--red);">⚠️ โหลดข้อมูลไม่สำเร็จ</div>
+        <div class="lbl">Apps Script อาจกำลังแออัดหรือช้าผิดปกติ ลองใหม่อีกครั้ง</div>
+        <button class="todaybtn" style="margin-top:10px;" onclick="loadData()">🔄 ลองใหม่</button>
+      </div>
+    `;
+    return;
   }
   render();
 }
