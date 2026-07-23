@@ -398,14 +398,107 @@ function fileToCompressedDataUrl(file, maxDim=640, quality=0.45){
   });
 }
 
+// ---------- room type classification ----------
+// จำแนกประเภทห้องจากชื่อห้อง เพื่อเลือกชุดรายการตรวจเช็กที่เหมาะสม
+function classifyRoom(name){
+  const n = name || "";
+  if (n.includes("สื่อสาร")) return "comms";
+  if (n.includes("พัดลม")) return "ventilation_fan";
+  if (n.includes("ไฟฟ้า")) return "electrical";
+  if (n.includes("ปรับอากาศ") || n.includes("Chiller") || n.includes("Cooling")) return "hvac";
+  if (n.includes("สุขาภิบาล") || n.includes("Booster Pump")) return "sanitary";
+  if (n.includes("แก๊สทางการแพทย์")) return "medical_gas";
+  if (n.toLowerCase().includes("fire pump")) return "fire_pump";
+  if (n.includes("ลิฟต์")) return "elevator";
+  if (n.includes("ขนส่ง")) return "transport";
+  if (n.includes("ธาราบำบัด")) return "hydrotherapy";
+  return "general";
+}
+
+const ROOM_TYPE_LABELS = {
+  electrical: "ห้องระบบไฟฟ้า",
+  comms: "ห้องระบบสื่อสาร",
+  hvac: "ห้องระบบปรับอากาศ",
+  sanitary: "ห้องระบบสุขาภิบาล",
+  medical_gas: "ห้องแก๊สทางการแพทย์",
+  fire_pump: "ห้อง Fire Pump",
+  elevator: "ห้องเครื่องลิฟต์",
+  ventilation_fan: "ห้องพัดลม/ระบายอากาศ",
+  transport: "ห้องขนส่ง",
+  hydrotherapy: "ห้องระบบธาราบำบัด",
+  general: "ห้องงานระบบทั่วไป"
+};
+
+// รายการตรวจเช็กพื้นฐาน — ใช้กับห้องทุกประเภท
+const BASE_CHECKLIST = [
+  { key: "clean", title: "ความสะอาดของห้อง", okLabel: "ห้องสะอาด", badLabel: "ไม่สะอาด",
+    placeholder: "ระบุเหตุผล เช่น มีขยะ, มีเศษฝุ่น, มีน้ำขัง..." },
+  { key: "lock", title: "การล็อกห้องและประตู", okLabel: "ล็อกได้", badLabel: "ล็อกไม่ได้",
+    placeholder: "ระบุเหตุผล เช่น กุญแจหาย, กลอนชำรุด..." },
+  { key: "floor", title: "ระดับพื้นห้อง", okLabel: "ปกติ", badLabel: "ไม่ปกติ",
+    placeholder: "ระบุเหตุผล เช่น พื้นทรุด, มีน้ำขัง..." },
+  { key: "waterBarrier", title: "แนวกันน้ำล้น (ธรณีประตู/ขอบกันน้ำ)", okLabel: "มี/สภาพดี", badLabel: "ไม่มี/ชำรุด",
+    placeholder: "ระบุเหตุผล เช่น ไม่มีแนวกันน้ำล้น, ชำรุด, สูงไม่พอ..." }
+];
+
+// รายการตรวจเช็กเพิ่มเติมเฉพาะประเภทห้อง
+const TYPE_CHECKLISTS = {
+  electrical: [
+    { key: "panel", title: "สภาพตู้ไฟฟ้า/แผงสวิตช์", okLabel: "ปกติ", badLabel: "ผิดปกติ",
+      placeholder: "ระบุเหตุผล เช่น มีรอยไหม้, กลิ่นไหม้, เสียงผิดปกติ..." },
+    { key: "safetySign", title: "ป้ายเตือน/อุปกรณ์ความปลอดภัยทางไฟฟ้า", okLabel: "ครบถ้วน", badLabel: "ไม่ครบถ้วน",
+      placeholder: "ระบุเหตุผล เช่น ป้ายเตือนหาย, ไม่มีคีบยางฉนวน..." }
+  ],
+  comms: [
+    { key: "rack", title: "ตู้ Rack และสายสัญญาณ", okLabel: "เป็นระเบียบ", badLabel: "ไม่เป็นระเบียบ",
+      placeholder: "ระบุเหตุผล เช่น สายไม่เรียบร้อย, มีฝุ่นเกาะอุปกรณ์..." },
+    { key: "roomTemp", title: "อุณหภูมิ/ระบบระบายความร้อนของห้อง", okLabel: "ปกติ", badLabel: "ผิดปกติ",
+      placeholder: "ระบุเหตุผล เช่น เครื่องปรับอากาศห้องสื่อสารเสีย, ร้อนผิดปกติ..." }
+  ],
+  hvac: [
+    { key: "leak", title: "รอยรั่วซึมของท่อน้ำ/สารทำความเย็น", okLabel: "ไม่พบ", badLabel: "พบรอยรั่ว",
+      placeholder: "ระบุตำแหน่งและลักษณะรอยรั่ว..." },
+    { key: "filter", title: "แผ่นกรองอากาศ", okLabel: "สะอาด", badLabel: "สกปรก/อุดตัน",
+      placeholder: "ระบุเหตุผล เช่น ฝุ่นเกาะหนา, ยังไม่ได้ล้าง..." }
+  ],
+  sanitary: [
+    { key: "pump", title: "ท่อ/ปั๊มน้ำ/วาล์ว", okLabel: "ปกติ ไม่รั่วซึม", badLabel: "รั่วซึม/ผิดปกติ",
+      placeholder: "ระบุตำแหน่งและลักษณะการรั่วซึม..." }
+  ],
+  medical_gas: [
+    { key: "gasPressure", title: "แรงดันแก๊ส/สภาพท่อและข้อต่อ", okLabel: "ปกติ", badLabel: "ผิดปกติ",
+      placeholder: "ระบุเหตุผล เช่น แรงดันตก, พบรอยรั่ว..." },
+    { key: "gasSafetySign", title: "ป้ายเตือน/สัญลักษณ์ความปลอดภัย", okLabel: "ครบถ้วน", badLabel: "ไม่ครบถ้วน",
+      placeholder: "ระบุเหตุผล เช่น ป้ายห้ามสูบบุหรี่หาย..." }
+  ],
+  fire_pump: [
+    { key: "firePumpStatus", title: "แรงดันน้ำและระบบสตาร์ทอัตโนมัติ", okLabel: "ปกติ", badLabel: "ผิดปกติ",
+      placeholder: "ระบุเหตุผล เช่น แรงดันต่ำกว่าเกณฑ์, สตาร์ทไม่ทำงาน..." }
+  ],
+  elevator: [
+    { key: "elevatorMotor", title: "เสียง/การสั่นสะเทือนของมอเตอร์ลิฟต์", okLabel: "ปกติ", badLabel: "ผิดปกติ",
+      placeholder: "ระบุลักษณะเสียง/การสั่นสะเทือนที่พบ..." }
+  ],
+  ventilation_fan: [
+    { key: "fanBelt", title: "สายพาน/มอเตอร์พัดลม", okLabel: "ปกติ", badLabel: "ผิดปกติ",
+      placeholder: "ระบุเหตุผล เช่น สายพานหลวม, มอเตอร์มีเสียงดัง..." }
+  ],
+  transport: [],
+  hydrotherapy: [],
+  general: []
+};
+
+function getChecklistForRoom(room){
+  const type = classifyRoom(room.name);
+  const extra = TYPE_CHECKLISTS[type] || [];
+  return { type, items: BASE_CHECKLIST.concat(extra) };
+}
+
 // ---------- state ----------
 let currentRoom = null;
 let photos = []; // array of dataURLs
-let checks = {
-  clean: null, cleanReason: "",
-  lock: null, lockReason: "",
-  floor: null, floorReason: ""
-};
+let checks = {};
+let currentChecklist = { type: "general", items: BASE_CHECKLIST };
 
 const params = new URLSearchParams(location.search);
 const roomIdParam = params.get("room");
@@ -451,7 +544,7 @@ function renderPicker(){
       <div class="search-item" data-id="${r.id}">
         <div>
           <div class="name">${r.name}</div>
-          <div class="meta">ชั้น ${r.floor} · โซน ${r.zone}${r.location && r.location!=="ส่วนกลาง" ? " · "+r.location : ""}</div>
+          <div class="meta">ชั้น ${r.floor} · โซน ${r.zone}${r.location && r.location!=="ส่วนกลาง" ? " · "+r.location : ""} · ${ROOM_TYPE_LABELS[classifyRoom(r.name)]}</div>
         </div>
         <div class="meta">#${r.id}</div>
       </div>
@@ -556,12 +649,13 @@ function handleQrDecoded(text){
 
 document.getElementById("qrScanCloseBtn").addEventListener("click", stopQrScan);
 
-function toggleGroup(key, value, reasonNeeded){
+function toggleGroup(key, value){
   checks[key] = value;
   render_active_states();
 }
 function render_active_states(){
-  ["clean","lock","floor"].forEach(key=>{
+  currentChecklist.items.forEach(item=>{
+    const key = item.key;
     const okBtn = document.getElementById(key+"_ok");
     const badBtn = document.getElementById(key+"_bad");
     const reasonBox = document.getElementById(key+"_reasonbox");
@@ -574,11 +668,30 @@ function render_active_states(){
 
 function renderForm(){
   const r = currentRoom;
+  currentChecklist = getChecklistForRoom(r);
   const app = document.getElementById("app");
+
+  const sectionsHtml = currentChecklist.items.map((item, i) => `
+    <div class="section">
+      <div class="head"><span class="num">${i+1}</span><h3>${item.title}</h3></div>
+      <div class="toggle-pair">
+        <button type="button" class="toggle-btn ok" id="${item.key}_ok" onclick="toggleGroup('${item.key}','ok')">${item.okLabel}</button>
+        <button type="button" class="toggle-btn bad" id="${item.key}_bad" onclick="toggleGroup('${item.key}','bad')">${item.badLabel}</button>
+      </div>
+      <div class="reason-box" id="${item.key}_reasonbox">
+        <textarea id="${item.key}_reason" placeholder="${item.placeholder}"></textarea>
+        <div class="hint">กรุณาระบุเหตุผลและถ่ายรูปประกอบด้านล่าง</div>
+      </div>
+    </div>
+  `).join("");
+
+  const noteNum = currentChecklist.items.length + 1;
+  const photoNum = currentChecklist.items.length + 2;
+
   app.innerHTML = `
     <div class="room-card">
       <span class="change-link" id="changeRoomBtn">เปลี่ยนห้อง</span>
-      <span class="tag">ชั้น ${r.floor}</span><span class="tag">โซน ${r.zone}</span>
+      <span class="tag">ชั้น ${r.floor}</span><span class="tag">โซน ${r.zone}</span><span class="tag">${ROOM_TYPE_LABELS[currentChecklist.type]}</span>
       <h2>${r.name}</h2>
       <div class="sub">${r.location && r.location!=="ส่วนกลาง" ? r.location+" · " : ""}รอบตรวจปกติ: ${r.day_raw || "-"}</div>
       <div class="sub">ผู้รับผิดชอบพื้นที่: ${r.supervisor || "-"}</div>
@@ -595,49 +708,15 @@ function renderForm(){
       </div>
     </div>
 
-    <div class="section">
-      <div class="head"><span class="num">1</span><h3>ความสะอาดของห้อง</h3></div>
-      <div class="toggle-pair">
-        <button type="button" class="toggle-btn ok" id="clean_ok" onclick="toggleGroup('clean','ok')">ห้องสะอาด</button>
-        <button type="button" class="toggle-btn bad" id="clean_bad" onclick="toggleGroup('clean','bad')">ไม่สะอาด</button>
-      </div>
-      <div class="reason-box" id="clean_reasonbox">
-        <textarea id="clean_reason" placeholder="ระบุเหตุผล เช่น มีขยะ, มีเศษฝุ่น, มีน้ำขัง..."></textarea>
-        <div class="hint">กรุณาระบุเหตุผลและถ่ายรูปประกอบด้านล่าง</div>
-      </div>
-    </div>
+    ${sectionsHtml}
 
     <div class="section">
-      <div class="head"><span class="num">2</span><h3>การล็อกห้องและประตู</h3></div>
-      <div class="toggle-pair">
-        <button type="button" class="toggle-btn ok" id="lock_ok" onclick="toggleGroup('lock','ok')">ล็อกได้</button>
-        <button type="button" class="toggle-btn bad" id="lock_bad" onclick="toggleGroup('lock','bad')">ล็อกไม่ได้</button>
-      </div>
-      <div class="reason-box" id="lock_reasonbox">
-        <textarea id="lock_reason" placeholder="ระบุเหตุผล เช่น กุญแจหาย, กลอนชำรุด..."></textarea>
-        <div class="hint">กรุณาระบุเหตุผลและถ่ายรูปประกอบด้านล่าง</div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="head"><span class="num">3</span><h3>ระดับพื้นห้อง</h3></div>
-      <div class="toggle-pair">
-        <button type="button" class="toggle-btn ok" id="floor_ok" onclick="toggleGroup('floor','ok')">ปกติ</button>
-        <button type="button" class="toggle-btn bad" id="floor_bad" onclick="toggleGroup('floor','bad')">ไม่ปกติ</button>
-      </div>
-      <div class="reason-box" id="floor_reasonbox">
-        <textarea id="floor_reason" placeholder="ระบุเหตุผล เช่น พื้นทรุด, มีน้ำขัง..."></textarea>
-        <div class="hint">กรุณาระบุเหตุผลและถ่ายรูปประกอบด้านล่าง</div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="head"><span class="num">4</span><h3>หมายเหตุอื่นๆ</h3></div>
+      <div class="head"><span class="num">${noteNum}</span><h3>หมายเหตุอื่นๆ</h3></div>
       <textarea class="note" id="otherNote" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
     </div>
 
     <div class="section">
-      <div class="head"><span class="num">5</span><h3>รูปถ่ายหลักฐาน <span style="color:var(--red)">*จำเป็น</span></h3></div>
+      <div class="head"><span class="num">${photoNum}</span><h3>รูปถ่ายหลักฐาน <span style="color:var(--red)">*จำเป็น</span></h3></div>
       <div class="photo-zone" id="photoZone">
         <div class="thumbs" id="thumbs"></div>
         <div class="photo-btn-row">
@@ -662,7 +741,8 @@ function renderForm(){
     </div>
   `;
   photos = [];
-  checks = {clean:null,cleanReason:"",lock:null,lockReason:"",floor:null,floorReason:""};
+  checks = {};
+  currentChecklist.items.forEach(item => { checks[item.key] = null; });
   document.getElementById("changeRoomBtn").addEventListener("click", ()=>{ location.href = location.pathname; });
   document.getElementById("cameraInput").addEventListener("change", onPhotosSelected);
   document.getElementById("galleryInput").addEventListener("change", onPhotosSelected);
@@ -695,9 +775,10 @@ function renderThumbs(){
 }
 
 function validate(){
-  for (const key of ["clean","lock","floor"]){
+  for (const item of currentChecklist.items){
+    const key = item.key;
     if (!checks[key]){
-      showToast("กรุณาติ๊กสถานะให้ครบทั้ง 3 ข้อ", "err");
+      showToast("กรุณาติ๊กสถานะให้ครบทุกข้อ", "err");
       return false;
     }
     if (checks[key] === "bad"){
@@ -723,22 +804,36 @@ async function onSubmit(){
   if (!inspector){ showToast("กรุณาระบุชื่อผู้ตรวจ", "err"); return; }
   localStorage.setItem("fivess_last_inspector", inspector);
 
+  const checklistResults = currentChecklist.items.map(item => ({
+    key: item.key,
+    title: item.title,
+    status: checks[item.key],
+    reason: document.getElementById(item.key+"_reason") ? document.getElementById(item.key+"_reason").value.trim() : ""
+  }));
+
   const record = {
     localId: "r"+Date.now()+"_"+Math.random().toString(36).slice(2,7),
     roomId: currentRoom.id,
     roomName: currentRoom.name,
+    roomType: currentChecklist.type,
+    roomTypeLabel: ROOM_TYPE_LABELS[currentChecklist.type],
     floor: currentRoom.floor,
     zone: currentRoom.zone,
     location: currentRoom.location,
     supervisor: currentRoom.supervisor,
     inspDate: document.getElementById("inspDate").value,
     inspector: inspector,
+    // รายการตรวจเช็กแบบไดนามิกตามประเภทห้อง (รวมแนวกันน้ำล้น)
+    checklist: checklistResults,
+    // ฟิลด์เดิมสำหรับความเข้ากันได้กับระบบหลังบ้าน/แดชบอร์ดเดิม
     clean: checks.clean,
-    cleanReason: document.getElementById("clean_reason").value.trim(),
+    cleanReason: checklistResults.find(c=>c.key==="clean") ? checklistResults.find(c=>c.key==="clean").reason : "",
     lock: checks.lock,
-    lockReason: document.getElementById("lock_reason").value.trim(),
+    lockReason: checklistResults.find(c=>c.key==="lock") ? checklistResults.find(c=>c.key==="lock").reason : "",
     floorStatus: checks.floor,
-    floorReason: document.getElementById("floor_reason").value.trim(),
+    floorReason: checklistResults.find(c=>c.key==="floor") ? checklistResults.find(c=>c.key==="floor").reason : "",
+    waterBarrier: checks.waterBarrier,
+    waterBarrierReason: checklistResults.find(c=>c.key==="waterBarrier") ? checklistResults.find(c=>c.key==="waterBarrier").reason : "",
     note: document.getElementById("otherNote").value.trim(),
     photos: photos,
     submittedAt: new Date().toISOString(),
