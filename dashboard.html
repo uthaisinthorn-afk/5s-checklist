@@ -63,6 +63,38 @@
   .stat.bad .num{color:var(--red);}
   .stat.pending .num{color:var(--amber);}
 
+  /* ---------- Overdue alert panel ---------- */
+  .overdue-panel{
+    max-width:1100px;margin:14px auto 0;padding:0 18px;
+  }
+  .overdue-box{
+    background:#fdf1ef;border:1.5px solid var(--red);border-radius:12px;padding:14px 16px;
+  }
+  .overdue-box.none{background:#eefaf4;border-color:var(--green);}
+  .overdue-head{
+    display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;
+  }
+  .overdue-head .title{font-size:14.5px;font-weight:700;color:var(--red);}
+  .overdue-box.none .overdue-head .title{color:var(--green);}
+  .overdue-head .count{
+    background:var(--red);color:#fff;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:700;
+  }
+  .overdue-box.none .overdue-head .count{background:var(--green);}
+  .overdue-head .toggle{font-size:12px;color:var(--muted);}
+  .overdue-list{margin-top:10px;display:none;}
+  .overdue-list.show{display:block;}
+  .overdue-item{
+    display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:8px 0;border-bottom:1px solid #f0d9d5;font-size:13px;
+  }
+  .overdue-item:last-child{border-bottom:none;}
+  .overdue-item .rname{font-weight:600;color:var(--navy);}
+  .overdue-item .rmeta{font-size:11.5px;color:var(--muted);margin-top:1px;}
+  .overdue-item .days{
+    flex-shrink:0;font-size:12px;font-weight:700;color:var(--red);background:#fbe0dc;border-radius:999px;padding:3px 10px;white-space:nowrap;
+  }
+  .overdue-item .days.never{background:#f3d4ce;}
+
   .section-title{
     max-width:1100px;margin:22px auto 8px;padding:0 18px;
     font-size:14px;font-weight:700;color:var(--navy);
@@ -153,6 +185,16 @@
 
   <div class="stats" id="stats"></div>
 
+  <div class="overdue-panel">
+    <div class="overdue-box" id="overdueBox">
+      <div class="overdue-head" id="overdueHead" onclick="toggleOverdueList()">
+        <div class="title" id="overdueTitle">⏳ กำลังตรวจสอบห้องที่เกินกำหนด...</div>
+        <div class="toggle" id="overdueToggle"></div>
+      </div>
+      <div class="overdue-list" id="overdueList"></div>
+    </div>
+  </div>
+
   <div class="section-title">📋 ห้องที่ตรวจแล้ว <span class="count" id="cInspected">0</span></div>
   <div class="list" id="listInspected"></div>
 
@@ -173,7 +215,8 @@
 // ============================================================
 const CONFIG = {
   GAS_URL: "https://script.google.com/macros/s/AKfycbz_NyfEA-oiXAQ3kJK3xix-TEGE_Nh_meC_vknvHrBsXp8WtQG3P0aaB-QTgkWAR9ze/exec",
-  PASSWORD: "5s2569"   // <-- เปลี่ยนรหัสผ่านตรงนี้ได้เลย
+  PASSWORD: "5s2569",   // <-- เปลี่ยนรหัสผ่านตรงนี้ได้เลย
+  OVERDUE_DAYS: 7       // <-- ห้องที่ไม่ได้ตรวจเกินกี่วันถึงจะขึ้นแจ้งเตือน
 };
 
 // ============================================================
@@ -204,6 +247,9 @@ if (sessionStorage.getItem("5s_dash_auth") === "1"){
 const ROOMS = [{"id": 1, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 2, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 3, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 4, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 5, "name": "ห้องระบบสุขาภิบาล", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 6, "name": "ห้องเก็บแก๊สทางการแพทย์", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 7, "name": "ห้องเครื่องระบบแก๊สทางการแพทย์", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 8, "name": "ห้อง Fire pump B4", "location": "ส่วนกลาง", "zone": "PC", "floor": "B4"}, {"id": 9, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B3"}, {"id": 10, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B3"}, {"id": 11, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B3"}, {"id": 12, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B3"}, {"id": 13, "name": "ห้องเครื่องระบบปรับอากาศ Chiller", "location": "ส่วนกลาง", "zone": "PC", "floor": "B3"}, {"id": 14, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B2"}, {"id": 15, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B2"}, {"id": 16, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B2"}, {"id": 17, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B2"}, {"id": 18, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 19, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 20, "name": "ห้องเครื่องไฟฟ้าหลัก MDB", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 21, "name": "ห้องเครื่องระบบไฟฟ้าสำรองฉุกเฉิน", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 22, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 23, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 24, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 25, "name": "ห้องสื่อสาร (สำนักงานเภสัช)", "location": "สำนักงานเภสัช / ห้อง Staff Lounge", "zone": "PC", "floor": "B1"}, {"id": 26, "name": "ห้องเครื่องระบบปรับอากาศ (คลังยา)", "location": "คลังยา", "zone": "PC", "floor": "B1"}, {"id": 27, "name": "ห้องพัดลมลานจอดเติมอากาศ", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 28, "name": "ห้องพัดลมลานจอดดูดอากาศ", "location": "ส่วนกลาง", "zone": "PC", "floor": "B1"}, {"id": 29, "name": "ห้องหม้อน้ำเครื่องระบบไฟฟ้าสำรองฉุกเฉิน", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 30, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 31, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 32, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "1"}, {"id": 33, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 34, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 35, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 36, "name": "ห้องสื่อสาร (ใกล้บันไดหนีไฟ 4)", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 37, "name": "ห้องพัดลมระบายความร้อนเครื่องกำเนิดไฟฟ้าสำรอง", "location": "ส่วนกลาง", "zone": "PC", "floor": "1"}, {"id": 38, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 39, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 40, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "M"}, {"id": 41, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 42, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 43, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 44, "name": "ห้องลาน Cooling", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 45, "name": "ห้องสื่อสาร (ใกล้บันไดหนีไฟ 4)", "location": "ส่วนกลาง", "zone": "PC", "floor": "M"}, {"id": 46, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 47, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 48, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 49, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "2"}, {"id": 50, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 51, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 52, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 53, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "2"}, {"id": 54, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 55, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 56, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 57, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "3"}, {"id": 58, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 59, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 60, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 61, "name": "ห้องสื่อสาร (ใกล้บันไดหนีไฟ 4)", "location": "ส่วนกลาง", "zone": "PC", "floor": "3"}, {"id": 62, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 63, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 64, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 65, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "4"}, {"id": 66, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 67, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 68, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 69, "name": "ห้องสื่อสาร (ใกล้บันไดหนีไฟ 4)", "location": "ส่วนกลาง", "zone": "PC", "floor": "4"}, {"id": 70, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 71, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 72, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 73, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "5"}, {"id": 74, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 75, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 76, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 77, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "5"}, {"id": 78, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 79, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 80, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 81, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 82, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 83, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 84, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 85, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "6"}, {"id": 86, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 87, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 88, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 89, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "7"}, {"id": 90, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 91, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 92, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 93, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "7"}, {"id": 94, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 95, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 96, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 97, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 98, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 99, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 100, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 101, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "8"}, {"id": 102, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 103, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 104, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 105, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "9"}, {"id": 106, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 107, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 108, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 109, "name": "ห้องสื่อสาร (ใกล้บันไดหนีไฟ 4)", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 110, "name": "ห้องเครื่องลิฟต์ L36 - L38", "location": "ส่วนกลาง", "zone": "PC", "floor": "9"}, {"id": 111, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 112, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 113, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 114, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "10"}, {"id": 115, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 116, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 117, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 118, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "10"}, {"id": 119, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 120, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 121, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 122, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "11"}, {"id": 123, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 124, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 125, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 126, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "11"}, {"id": 127, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 128, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 129, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 130, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "12"}, {"id": 131, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 132, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 133, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 134, "name": "ห้องสื่อสาร (ฝั่งราชดำริ)", "location": "ส่วนกลาง", "zone": "PC", "floor": "12"}, {"id": 135, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 136, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 137, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 138, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "13"}, {"id": 139, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 140, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 141, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 142, "name": "ห้องสื่อสาร (ภายในห้องควบคุมระบบ AV 370)", "location": "ส่วนกลาง", "zone": "PC", "floor": "13"}, {"id": 143, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "14"}, {"id": 144, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "14"}, {"id": 145, "name": "ห้องไฟฟ้า 3", "location": "ส่วนกลาง", "zone": "PC", "floor": "14"}, {"id": 146, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "14"}, {"id": 147, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "14"}, {"id": 148, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "14"}, {"id": 149, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "14"}, {"id": 150, "name": "ห้องเครื่องลิฟต์ L39 - L42", "location": "ส่วนกลาง", "zone": "EC", "floor": "14"}, {"id": 151, "name": "ห้องเครื่องลิฟต์ L43 - L44", "location": "ส่วนกลาง", "zone": "EC", "floor": "14"}, {"id": 152, "name": "ห้องเครื่องระบบธาราบำบัด", "location": "ส่วนกลาง", "zone": "EC", "floor": "14"}, {"id": 153, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "15"}, {"id": 154, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "15"}, {"id": 155, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "15"}, {"id": 156, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "15"}, {"id": 157, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "15"}, {"id": 158, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "15"}, {"id": 159, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "15"}, {"id": 160, "name": "ห้องเครื่องลิฟต์ L24 - L31", "location": "ส่วนกลาง", "zone": "PC", "floor": "15"}, {"id": 161, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "16"}, {"id": 162, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "16"}, {"id": 163, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "EC", "floor": "16"}, {"id": 164, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "16"}, {"id": 165, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "16"}, {"id": 166, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "16"}, {"id": 167, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "16"}, {"id": 168, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 169, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 170, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 171, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 172, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 173, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 174, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "17"}, {"id": 175, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 176, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 177, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 178, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 179, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 180, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 181, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "18"}, {"id": 182, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 183, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 184, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 185, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 186, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 187, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 188, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "19"}, {"id": 189, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 190, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 191, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 192, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 193, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 194, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 195, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "20"}, {"id": 196, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 197, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 198, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 199, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 200, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 201, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 202, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "21"}, {"id": 203, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 204, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 205, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 206, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 207, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 208, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 209, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "22"}, {"id": 210, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 211, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 212, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 213, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 214, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 215, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 216, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "23"}, {"id": 217, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 218, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 219, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 220, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 221, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 222, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 223, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "24"}, {"id": 224, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 225, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 226, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 227, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 228, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 229, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 230, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "25"}, {"id": 231, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 232, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 233, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 234, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 235, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 236, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 237, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "26"}, {"id": 238, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 239, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 240, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 241, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 242, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 243, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 244, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "27"}, {"id": 245, "name": "ห้องไฟฟ้า 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 246, "name": "ห้องไฟฟ้า 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 247, "name": "ห้องไฟฟ้า EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 248, "name": "ห้องสื่อสาร EC", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 249, "name": "ห้องปรับอากาศ 1", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 250, "name": "ห้องปรับอากาศ 2", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 251, "name": "ห้องขนส่ง", "location": "ส่วนกลาง", "zone": "PC", "floor": "28"}, {"id": 252, "name": "ห้องพัดลมอัดอากาศ ST.1", "location": "ส่วนกลาง", "zone": "PC", "floor": "Roof"}, {"id": 253, "name": "ห้องพัดลมอัดอากาศ ST.3", "location": "ส่วนกลาง", "zone": "PC", "floor": "Roof"}, {"id": 254, "name": "ห้องพัดลมอัดอากาศ ST.5", "location": "ส่วนกลาง", "zone": "EC", "floor": "Roof"}, {"id": 255, "name": "ห้องพัดลมอัดอากาศโถงลิฟต์ L4 - L7", "location": "ส่วนกลาง", "zone": "PC", "floor": "Roof"}, {"id": 256, "name": "ห้องเครื่องลิฟต์ L1 - L23", "location": "ส่วนกลาง", "zone": "PC", "floor": "Roof"}, {"id": 257, "name": "ห้องระบบสุขาภิบาล (Booster Pump)", "location": "ส่วนกลาง", "zone": "PC", "floor": "Roof"}];
 
 let currentRecords = [];
+let lastCheckMap = {};   // { roomId: "yyyy-MM-dd" ล่าสุดที่ตรวจ } — ดึงมาครั้งเดียวตอนโหลดหน้า ครอบคลุมประวัติทั้งหมด ไม่ใช่แค่วันที่เลือกดู
+let lastCheckLoaded = false;
+let overdueExpanded = false;
 
 // ============================================================
 // Helpers
@@ -217,6 +263,100 @@ function driveThumb(url, size){
   const m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
   if (!m) return url;
   return "https://drive.google.com/thumbnail?id=" + m[1] + "&sz=w" + (size||500);
+}
+
+// ============================================================
+// แจ้งเตือนห้องที่เกินกำหนดตรวจ (คำนวณจากประวัติ "ทั้งหมด" ไม่ใช่แค่
+// วันที่กำลังดูอยู่บนหน้าจอ) — ดึง lastCheckMap ครั้งเดียวตอนโหลดหน้า
+// ============================================================
+async function loadLastCheck(){
+  try{
+    const url = CONFIG.GAS_URL + "?action=lastcheck";
+    const resp = await fetch(url);
+    lastCheckMap = await resp.json();
+  }catch(e){
+    console.error("โหลดข้อมูลวันตรวจล่าสุดไม่สำเร็จ", e);
+    lastCheckMap = null; // null = โหลดไม่สำเร็จ แยกจาก {} ที่แปลว่าไม่มีห้องไหนถูกตรวจเลย
+  }
+  lastCheckLoaded = true;
+  renderOverdue();
+}
+
+function daysBetween(dateStr, todayIso){
+  const a = new Date(dateStr + "T00:00:00");
+  const b = new Date(todayIso + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+
+function renderOverdue(){
+  if (!lastCheckLoaded) return; // ยังโหลดไม่เสร็จ — คงข้อความ "กำลังตรวจสอบ..." ไว้ก่อน
+
+  const box = document.getElementById("overdueBox");
+  const title = document.getElementById("overdueTitle");
+  const toggle = document.getElementById("overdueToggle");
+  const listEl = document.getElementById("overdueList");
+
+  if (lastCheckMap === null){
+    box.className = "overdue-box";
+    title.textContent = "⚠️ ตรวจสอบห้องเกินกำหนดไม่สำเร็จ (โหลดข้อมูลไม่ได้)";
+    toggle.textContent = "";
+    listEl.classList.remove("show");
+    listEl.innerHTML = "";
+    return;
+  }
+
+  // ใช้ตัวกรองชั้น/โซน/ค้นหาเดียวกับรายการหลัก เพื่อให้แจ้งเตือนตรงกับ
+  // ขอบเขตห้องที่กำลังดูอยู่
+  const floor = document.getElementById("floorFilter").value;
+  const zone = document.getElementById("zoneFilter").value;
+  const q = document.getElementById("searchBox").value.trim().toLowerCase();
+  let roomsInScope = ROOMS.slice();
+  if (floor) roomsInScope = roomsInScope.filter(r=>r.floor===floor);
+  if (zone) roomsInScope = roomsInScope.filter(r=>r.zone===zone);
+  if (q) roomsInScope = roomsInScope.filter(r=>r.name.toLowerCase().includes(q));
+
+  const today = todayStr();
+  const overdue = [];
+  roomsInScope.forEach(room=>{
+    const lastDate = lastCheckMap[room.id];
+    if (!lastDate){
+      overdue.push({ room, lastDate: null, days: Infinity });
+      return;
+    }
+    const days = daysBetween(lastDate, today);
+    if (days > CONFIG.OVERDUE_DAYS){
+      overdue.push({ room, lastDate, days });
+    }
+  });
+  overdue.sort((a,b)=> b.days - a.days);
+
+  if (!overdue.length){
+    box.className = "overdue-box none";
+    title.textContent = "✅ ไม่มีห้องเกินกำหนดตรวจ (" + CONFIG.OVERDUE_DAYS + " วัน) ในขอบเขตนี้";
+    toggle.textContent = "";
+    listEl.classList.remove("show");
+    listEl.innerHTML = "";
+    return;
+  }
+
+  box.className = "overdue-box";
+  title.innerHTML = `⚠️ ห้องที่เกินกำหนดตรวจ (เกิน ${CONFIG.OVERDUE_DAYS} วัน) <span class="count">${overdue.length}</span>`;
+  toggle.textContent = overdueExpanded ? "ซ่อนรายการ ▲" : "ดูรายการ ▼";
+  listEl.classList.toggle("show", overdueExpanded);
+  listEl.innerHTML = overdue.map(({room, lastDate, days})=>`
+    <div class="overdue-item">
+      <div>
+        <div class="rname">${room.name}</div>
+        <div class="rmeta">ชั้น ${room.floor} · โซน ${room.zone}</div>
+      </div>
+      <span class="days ${lastDate ? '' : 'never'}">${lastDate ? ("ตรวจล่าสุด "+days+" วันที่แล้ว") : "ไม่เคยตรวจเลย"}</span>
+    </div>
+  `).join("");
+}
+
+function toggleOverdueList(){
+  overdueExpanded = !overdueExpanded;
+  renderOverdue();
 }
 
 function populateFilters(){
@@ -279,6 +419,7 @@ async function loadData(){
 }
 
 function render(){
+  renderOverdue();
   const floor = document.getElementById("floorFilter").value;
   const zone = document.getElementById("zoneFilter").value;
   const q = document.getElementById("searchBox").value.trim().toLowerCase();
@@ -408,6 +549,7 @@ function init(){
   });
   document.getElementById("dateInput").addEventListener("change", loadData);
   loadData();
+  loadLastCheck();
 }
 
 if (sessionStorage.getItem("5s_dash_auth") === "1"){
