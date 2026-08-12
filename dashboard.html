@@ -414,16 +414,23 @@ async function fetchRecordsForDate(date){
   if (weekCache[date]) return weekCache[date];
   if (weekCachePending[date]) return weekCachePending[date];
   const p = (async ()=>{
+    // ใส่ timeout กันค้าง เผื่อ Apps Script ตอบช้าหรือไม่ตอบเลย —
+    // ถ้าเกินเวลาจะถือว่าวันนั้น = ไม่มีข้อมูล แล้วไปต่อ ไม่ให้หน้าค้าง
+    const TIMEOUT_MS = 15000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), TIMEOUT_MS);
     try{
       const url = CONFIG.GAS_URL + "?action=records&date=" + encodeURIComponent(date);
-      const resp = await fetch(url);
+      const resp = await fetch(url, { signal: controller.signal });
       const data = await resp.json();
       weekCache[date] = data;
       return data;
     }catch(e){
-      console.error("โหลดข้อมูลวันที่ " + date + " ไม่สำเร็จ", e);
+      console.error("โหลดข้อมูลวันที่ " + date + " ไม่สำเร็จ (หรือช้าเกินไป)", e);
       weekCache[date] = []; // ถือว่าไม่มีข้อมูล กันไม่ให้ยอดสะสมพังทั้งหน้า
       return weekCache[date];
+    }finally{
+      clearTimeout(timeoutId);
     }
   })();
   weekCachePending[date] = p;
@@ -469,9 +476,13 @@ async function loadData(){
   }
 
   // ดึงผลตรวจของวันอื่นๆ ในสัปดาห์เดียวกัน (จันทร์ถึงวันที่เลือก) มาเตรียมไว้
-  // สำหรับคำนวณยอดสะสมทั้งสัปดาห์ — ถ้าดึงวันไหนไม่สำเร็จ จะถือว่าวันนั้น=0 ไม่ทำให้หน้าพัง
-  const weekDates = getWeekDatesUpTo(date);
-  await Promise.all(weekDates.filter(d => d !== date).map(d => fetchRecordsForDate(d)));
+  // สำหรับคำนวณยอดสะสมทั้งสัปดาห์ — ดึงทีละวัน (ไม่ยิงพร้อมกันหมด) เพื่อไม่ให้
+  // Apps Script โดนถล่มพร้อมกันจนช้าหรือค้าง แต่ละวันมี timeout ของตัวเองอยู่แล้ว
+  // ถ้าดึงวันไหนไม่สำเร็จ จะถือว่าวันนั้น=0 ไม่ทำให้หน้าพัง
+  const weekDates = getWeekDatesUpTo(date).filter(d => d !== date);
+  for (const d of weekDates){
+    await fetchRecordsForDate(d);
+  }
 
   render();
 }
