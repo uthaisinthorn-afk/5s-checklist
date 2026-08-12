@@ -492,6 +492,7 @@ function render(){
   const floor = document.getElementById("floorFilter").value;
   const zone = document.getElementById("zoneFilter").value;
   const q = document.getElementById("searchBox").value.trim().toLowerCase();
+  const date = document.getElementById("dateInput").value;
 
   let roomsInScope = ROOMS.slice();
   if (floor) roomsInScope = roomsInScope.filter(r=>r.floor===floor);
