@@ -507,14 +507,14 @@ function render(){
 
   // ยอดสะสมทั้งสัปดาห์ (จันทร์–วันที่เลือก): รวมจำนวนที่ตรวจของแต่ละวันเข้าด้วยกัน
   // (แต่ละวันตัดห้องซ้ำในวันเดียวกันออกก่อน แล้วค่อยบวกรวมข้ามวัน ตามที่ระบุไว้)
-  const roomIdSet = new Set(roomsInScope.map(r=>r.id));
+  const roomIdSet = new Set(roomsInScope.map(r=>String(r.id)));
   const weekDates = getWeekDatesUpTo(date);
   let weekPass = 0, weekIssue = 0;
   weekDates.forEach(d=>{
     const dayRecords = (d === date) ? currentRecords : (weekCache[d] || []);
     const dayByRoom = {};
     dayRecords.forEach(rec=>{
-      if (roomIdSet.has(rec.roomId)) dayByRoom[rec.roomId] = rec; // ห้องเดียวกัน วันเดียวกัน นับครั้งเดียว
+      if (roomIdSet.has(String(rec.roomId))) dayByRoom[rec.roomId] = rec; // ห้องเดียวกัน วันเดียวกัน นับครั้งเดียว
     });
     Object.values(dayByRoom).forEach(rec=>{
       if (rec.overall === "พบปัญหา") weekIssue++; else weekPass++;
