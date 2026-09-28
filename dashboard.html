@@ -157,6 +157,49 @@
   #lightbox.show{display:flex;}
   #lightbox img{max-width:94vw;max-height:90vh;object-fit:contain;}
 </style>
+<style id="printModuleStyles">
+  /* ===== โมดูลพิมพ์เอกสาร (เพิ่มใหม่ — ใช้ชื่อ pr* แยกจากระบบเดิม) ===== */
+  #prOpenRow{max-width:1100px;margin:0 auto;padding:8px 18px 0;}
+  #prBg{position:fixed;inset:0;background:rgba(14,42,61,.55);z-index:900;display:none;
+    align-items:center;justify-content:center;padding:16px;}
+  #prBg.show{display:flex;}
+  #prBox{background:#fff;border-radius:14px;max-width:460px;width:100%;padding:18px;
+    max-height:90vh;overflow:auto;font-family:'Sarabun',sans-serif;}
+  #prBox h3{margin:0 0 4px;font-size:17px;color:var(--navy);}
+  #prBox .prnote{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+  .prOpt{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;font-family:inherit;}
+  .prOpt:hover{border-color:var(--teal);background:#f1f8f7;}
+  .prOpt b{display:block;font-size:14px;color:#1b1f22;}
+  .prOpt span{font-size:12px;color:var(--muted);}
+  #prClose{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 16px;
+    font-family:inherit;cursor:pointer;width:100%;margin-top:2px;}
+  #prMsg{color:var(--red);font-size:13px;margin:4px 0 8px;display:none;}
+
+  #printArea{display:none;}
+  @media print{
+    @page{size:A4;margin:12mm 10mm;}
+    body{background:#fff !important;}
+    body > *:not(#printArea){display:none !important;}
+    #printArea{display:block !important;font-family:'Sarabun',sans-serif;color:#000;font-size:11.5pt;}
+    #printArea h1{font-size:15pt;margin:0 0 2px;}
+    #printArea .prsub{font-size:10.5pt;margin:0 0 2px;color:#222;}
+    #printArea .prmeta{font-size:10pt;margin:6px 0 8px;color:#222;}
+    #printArea table{width:100%;border-collapse:collapse;}
+    #printArea thead{display:table-header-group;}
+    #printArea th,#printArea td{border:1px solid #444;padding:3px 5px;font-size:10pt;vertical-align:top;}
+    #printArea th{background:#e8e8e8;text-align:center;}
+    #printArea tr{page-break-inside:avoid;}
+    #printArea td.c{text-align:center;}
+    #printArea .prsum{margin:8px 0;font-size:10.5pt;font-weight:700;}
+    #printArea .prsign{display:flex;gap:30px;margin-top:26px;page-break-inside:avoid;}
+    #printArea .prsign div{flex:1;text-align:center;font-size:10.5pt;}
+    #printArea .prsign .ln{border-bottom:1px dotted #000;height:28px;margin-bottom:4px;}
+    #printArea .prkpi{display:flex;gap:8px;margin:8px 0;}
+    #printArea .prkpi div{flex:1;border:1px solid #444;padding:6px;text-align:center;}
+    #printArea .prkpi b{display:block;font-size:16pt;}
+  }
+</style>
 </head>
 <body>
 
@@ -183,6 +226,8 @@
     <input type="text" id="searchBox" placeholder="ค้นหาชื่อห้อง...">
   </div>
 
+  <div id="prOpenRow"><button class="todaybtn" id="prOpenBtn" onclick="prOpenMenu()">🖨️ พิมพ์เอกสาร</button></div>
+
   <div class="stats" id="stats"></div>
 
   <div class="overdue-panel">
@@ -208,6 +253,21 @@
 <div id="lightbox" onclick="this.classList.remove('show')">
   <img id="lightboxImg" src="">
 </div>
+
+<!-- ===== โมดูลพิมพ์เอกสาร: หน้าต่างเลือกเอกสาร + พื้นที่พิมพ์ (ซ่อนไว้ ไม่แสดงบนหน้าจอ) ===== -->
+<div id="prBg" onclick="if(event.target===this)prCloseMenu()">
+  <div id="prBox">
+    <h3>🖨️ พิมพ์เอกสาร</h3>
+    <div class="prnote">เอกสารจะใช้ตัวกรอง ชั้น / โซน / ค้นหา ที่เลือกอยู่ด้านบน และวันที่ที่เลือก (ถ้าต้องการพิมพ์ทั้งหมด ให้เลือก "ทุกชั้น/ทุกโซน" และล้างช่องค้นหาก่อน)</div>
+    <div id="prMsg"></div>
+    <button class="prOpt" onclick="prPrint('overdue')"><b>⚠️ ห้องที่เกินกำหนดตรวจ</b><span>รายการห้องที่ไม่ได้ตรวจเกินกำหนด พร้อมวันที่ตรวจล่าสุด</span></button>
+    <button class="prOpt" onclick="prPrint('pending')"><b>⏳ ห้องที่ยังไม่ได้ตรวจ (วันที่เลือก)</b><span>รายการห้องที่ยังไม่มีผลตรวจในวันที่เลือก</span></button>
+    <button class="prOpt" onclick="prPrint('done')"><b>📋 ห้องที่ตรวจแล้ว (วันที่เลือก)</b><span>รายการห้องที่ตรวจแล้ว พร้อมผู้ตรวจและผลตรวจ</span></button>
+    <button class="prOpt" onclick="prPrint('week')"><b>📊 สรุปยอดสะสมสัปดาห์นี้</b><span>ยอดผ่าน / พบปัญหา / คงเหลือ สะสมตั้งแต่วันจันทร์ถึงวันที่เลือก</span></button>
+    <button id="prClose" onclick="prCloseMenu()">ปิด</button>
+  </div>
+</div>
+<div id="printArea"></div>
 
 <script>
 // ============================================================
@@ -414,16 +474,23 @@ async function fetchRecordsForDate(date){
   if (weekCache[date]) return weekCache[date];
   if (weekCachePending[date]) return weekCachePending[date];
   const p = (async ()=>{
+    // ใส่ timeout กันค้าง เผื่อ Apps Script ตอบช้าหรือไม่ตอบเลย —
+    // ถ้าเกินเวลาจะถือว่าวันนั้น = ไม่มีข้อมูล แล้วไปต่อ ไม่ให้หน้าค้าง
+    const TIMEOUT_MS = 15000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), TIMEOUT_MS);
     try{
       const url = CONFIG.GAS_URL + "?action=records&date=" + encodeURIComponent(date);
-      const resp = await fetch(url);
+      const resp = await fetch(url, { signal: controller.signal });
       const data = await resp.json();
       weekCache[date] = data;
       return data;
     }catch(e){
-      console.error("โหลดข้อมูลวันที่ " + date + " ไม่สำเร็จ", e);
+      console.error("โหลดข้อมูลวันที่ " + date + " ไม่สำเร็จ (หรือช้าเกินไป)", e);
       weekCache[date] = []; // ถือว่าไม่มีข้อมูล กันไม่ให้ยอดสะสมพังทั้งหน้า
       return weekCache[date];
+    }finally{
+      clearTimeout(timeoutId);
     }
   })();
   weekCachePending[date] = p;
@@ -469,19 +536,23 @@ async function loadData(){
   }
 
   // ดึงผลตรวจของวันอื่นๆ ในสัปดาห์เดียวกัน (จันทร์ถึงวันที่เลือก) มาเตรียมไว้
-  // สำหรับคำนวณยอดสะสมทั้งสัปดาห์ — ถ้าดึงวันไหนไม่สำเร็จ จะถือว่าวันนั้น=0 ไม่ทำให้หน้าพัง
-  const weekDates = getWeekDatesUpTo(date);
-  await Promise.all(weekDates.filter(d => d !== date).map(d => fetchRecordsForDate(d)));
+  // สำหรับคำนวณยอดสะสมทั้งสัปดาห์ — ดึงทีละวัน (ไม่ยิงพร้อมกันหมด) เพื่อไม่ให้
+  // Apps Script โดนถล่มพร้อมกันจนช้าหรือค้าง แต่ละวันมี timeout ของตัวเองอยู่แล้ว
+  // ถ้าดึงวันไหนไม่สำเร็จ จะถือว่าวันนั้น=0 ไม่ทำให้หน้าพัง
+  const weekDates = getWeekDatesUpTo(date).filter(d => d !== date);
+  for (const d of weekDates){
+    await fetchRecordsForDate(d);
+  }
 
   render();
 }
 
 function render(){
   renderOverdue();
-  const date = document.getElementById("dateInput").value;
   const floor = document.getElementById("floorFilter").value;
   const zone = document.getElementById("zoneFilter").value;
   const q = document.getElementById("searchBox").value.trim().toLowerCase();
+  const date = document.getElementById("dateInput").value;
 
   let roomsInScope = ROOMS.slice();
   if (floor) roomsInScope = roomsInScope.filter(r=>r.floor===floor);
@@ -507,6 +578,8 @@ function render(){
 
   // ยอดสะสมทั้งสัปดาห์ (จันทร์–วันที่เลือก): รวมจำนวนที่ตรวจของแต่ละวันเข้าด้วยกัน
   // (แต่ละวันตัดห้องซ้ำในวันเดียวกันออกก่อน แล้วค่อยบวกรวมข้ามวัน ตามที่ระบุไว้)
+  // หมายเหตุ: rec.roomId ที่ backend ส่งมาอาจเป็น string ส่วน room.id ใน ROOMS เป็น number
+  // ต้องแปลงเป็น string ทั้งคู่ก่อนเทียบ ไม่งั้น Set.has() จะเทียบไม่ตรงแบบเงียบๆ (เจอบั๊กนี้จริง)
   const roomIdSet = new Set(roomsInScope.map(r=>String(r.id)));
   const weekDates = getWeekDatesUpTo(date);
   let weekPass = 0, weekIssue = 0;
@@ -629,6 +702,176 @@ function init(){
 if (sessionStorage.getItem("5s_dash_auth") === "1"){
   init();
 }
+</script>
+<script id="printModule">
+// ============================================================
+// โมดูลพิมพ์เอกสาร — เพิ่มใหม่ แยกจากระบบเดิม
+// อ่านข้อมูลที่หน้าจอมีอยู่แล้ว (ROOMS, lastCheckMap, currentRecords, weekCache)
+// เท่านั้น ไม่เขียนทับ ไม่เรียกแก้ฟังก์ชัน/ตัวแปรเดิม และไม่ยิง request เพิ่ม
+// ============================================================
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var MONTHS = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+  var DAYS = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function thDate(iso){
+    var p = String(iso).split("-").map(Number);
+    return p[2] + " " + MONTHS[p[1]-1] + " " + (p[0]+543);
+  }
+  function thDay(iso){ return DAYS[new Date(iso + "T00:00:00").getDay()]; }
+  function nowText(){
+    var d = new Date();
+    return thDate(todayStr()) + " เวลา " + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + " น.";
+  }
+  function cleanSup(s){
+    return String(s || "").replace(/\s*หัวหน้าช่างเทคนิค\s*$/,"").replace(/\s+/g," ").trim() || "-";
+  }
+  function hasSup(){ return ROOMS.some(function(r){ return r.supervisor; }); }
+  function selDate(){ return $("dateInput").value || todayStr(); }
+
+  function getScope(){
+    var floor = $("floorFilter").value, zone = $("zoneFilter").value;
+    var q = $("searchBox").value.trim().toLowerCase();
+    var rooms = ROOMS.slice();
+    if (floor) rooms = rooms.filter(function(r){ return r.floor === floor; });
+    if (zone) rooms = rooms.filter(function(r){ return r.zone === zone; });
+    if (q) rooms = rooms.filter(function(r){ return r.name.toLowerCase().indexOf(q) >= 0; });
+    var label = [floor ? "ชั้น " + floor : "ทุกชั้น", zone ? "โซน " + zone : "ทุกโซน"];
+    if (q) label.push("ค้นหา \"" + $("searchBox").value.trim() + "\"");
+    return { rooms: rooms, label: label.join(" · ") };
+  }
+
+  function head(title, sub, scopeLabel){
+    return '<h1>' + esc(title) + '</h1>' +
+      '<div class="prsub">แดชบอร์ดหัวหน้าช่าง — สรุปผลตรวจ 5ส ห้องงานระบบ · อาคารภูมิสิริมังคลานุสรณ์</div>' +
+      '<div class="prmeta">' + (sub ? esc(sub) + '<br>' : '') + 'ขอบเขต: ' + esc(scopeLabel) + ' · พิมพ์เมื่อ: ' + esc(nowText()) + '</div>';
+  }
+  function signBlock(){
+    return '<div class="prsign"><div><div class="ln"></div>ผู้จัดทำ<br>วันที่ ........../........../..........</div>' +
+           '<div><div class="ln"></div>หัวหน้าช่าง<br>วันที่ ........../........../..........</div></div>';
+  }
+  function table(cols, rows){
+    var h = '<table><thead><tr>' + cols.map(function(c){ return '<th' + (c.w ? ' style="width:' + c.w + '"' : '') + '>' + esc(c.t) + '</th>'; }).join("") + '</tr></thead><tbody>';
+    if (!rows.length) h += '<tr><td colspan="' + cols.length + '" class="c">ไม่มีรายการ</td></tr>';
+    rows.forEach(function(r){
+      h += '<tr>' + r.map(function(cell, i){
+        return '<td' + (cols[i].c ? ' class="c"' : '') + (cols[i].nw ? ' style="white-space:nowrap"' : '') + '>' + cell + '</td>';
+      }).join("") + '</tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  // ---------- เอกสารแต่ละแบบ ----------
+  function docOverdue(){
+    if (!lastCheckLoaded || lastCheckMap === null) throw new Error("ข้อมูลวันตรวจล่าสุดยังโหลดไม่เสร็จ หรือโหลดไม่สำเร็จ — รอสักครู่หรือรีเฟรชหน้าแล้วลองใหม่");
+    var sc = getScope(), today = todayStr(), list = [];
+    sc.rooms.forEach(function(room){
+      var last = lastCheckMap[room.id];
+      if (!last){ list.push({room: room, last: null, days: Infinity}); return; }
+      var days = daysBetween(last, today);
+      if (days > CONFIG.OVERDUE_DAYS) list.push({room: room, last: last, days: days});
+    });
+    list.sort(function(a,b){ return b.days - a.days; });
+    var never = list.filter(function(x){ return !x.last; }).length;
+    var sup = hasSup();
+    var rows = list.map(function(x, i){
+      var r = [i+1, esc(x.room.name), esc(x.room.floor), esc(x.room.zone)];
+      if (sup) r.push(esc(cleanSup(x.room.supervisor)));
+      r.push(x.last ? esc(thDate(x.last)) : "ไม่เคยตรวจเลย");
+      r.push(x.last ? "เกิน " + (x.days - CONFIG.OVERDUE_DAYS) + " วัน" : "-");
+      r.push("");
+      return r;
+    });
+    var cols = [{t:"ที่",c:1,w:"6%"},{t:"ชื่อห้อง"},{t:"ชั้น",c:1,w:"7%"},{t:"โซน",c:1,w:"7%"}];
+    if (sup) cols.push({t:"ผู้รับผิดชอบ"});
+    cols.push({t:"ตรวจล่าสุด",w:"19%",nw:1},{t:"เกินกำหนด",c:1,w:"12%",nw:1},{t:"หมายเหตุ",w:"16%"});
+    return head("รายการห้องที่เกินกำหนดตรวจ", "เกณฑ์: ไม่ได้ตรวจเกิน " + CONFIG.OVERDUE_DAYS + " วัน (นับถึงวันที่ " + thDate(today) + ")", sc.label) +
+      '<div class="prsum">รวม ' + list.length + ' ห้อง (ไม่เคยตรวจเลย ' + never + ' ห้อง)</div>' +
+      table(cols, rows) + signBlock();
+  }
+
+  function docPending(){
+    if (!Array.isArray(currentRecords)) throw new Error("ข้อมูลของวันที่เลือกยังโหลดไม่เสร็จ — รอสักครู่แล้วลองใหม่");
+    var sc = getScope(), date = selDate(), done = {};
+    currentRecords.forEach(function(r){ done[String(r.roomId)] = 1; });
+    var list = sc.rooms.filter(function(r){ return !done[String(r.id)]; });
+    var sup = hasSup();
+    var rows = list.map(function(r, i){
+      var x = [i+1, esc(r.name), esc(r.floor), esc(r.zone)];
+      if (sup) x.push(esc(cleanSup(r.supervisor)));
+      x.push("");
+      return x;
+    });
+    var cols = [{t:"ที่",c:1,w:"7%"},{t:"ชื่อห้อง"},{t:"ชั้น",c:1,w:"8%"},{t:"โซน",c:1,w:"8%"}];
+    if (sup) cols.push({t:"ผู้รับผิดชอบ"});
+    cols.push({t:"หมายเหตุ",w:"22%"});
+    return head("รายการห้องที่ยังไม่ได้ตรวจ", "วันที่ " + thDay(date) + "ที่ " + thDate(date), sc.label) +
+      '<div class="prsum">รวม ' + list.length + ' ห้อง จากทั้งหมด ' + sc.rooms.length + ' ห้อง</div>' +
+      table(cols, rows) + signBlock();
+  }
+
+  function docDone(){
+    if (!Array.isArray(currentRecords)) throw new Error("ข้อมูลของวันที่เลือกยังโหลดไม่เสร็จ — รอสักครู่แล้วลองใหม่");
+    var sc = getScope(), date = selDate(), by = {};
+    currentRecords.forEach(function(r){ by[String(r.roomId)] = r; });
+    var list = [];
+    sc.rooms.forEach(function(room){ var rec = by[String(room.id)]; if (rec) list.push({room: room, rec: rec}); });
+    var issue = list.filter(function(x){ return x.rec.overall === "พบปัญหา"; }).length;
+    var rows = list.map(function(x, i){
+      return [i+1, esc(x.room.name), esc(x.room.floor), esc(x.room.zone), esc(x.rec.inspector || "-"), esc(x.rec.submittedAt || "-"), esc(x.rec.overall || "-")];
+    });
+    return head("รายการห้องที่ตรวจแล้ว", "วันที่ " + thDay(date) + "ที่ " + thDate(date), sc.label) +
+      '<div class="prsum">รวม ' + list.length + ' ห้อง (ผ่าน ' + (list.length - issue) + ' · พบปัญหา ' + issue + ')</div>' +
+      table([{t:"ที่",c:1,w:"6%"},{t:"ชื่อห้อง"},{t:"ชั้น",c:1,w:"7%"},{t:"โซน",c:1,w:"7%"},{t:"ผู้ตรวจ"},{t:"เวลาบันทึก"},{t:"ผล",c:1,w:"11%"}], rows) + signBlock();
+  }
+
+  function docWeek(){
+    if (!Array.isArray(currentRecords)) throw new Error("ข้อมูลของวันที่เลือกยังโหลดไม่เสร็จ — รอสักครู่แล้วลองใหม่");
+    var sc = getScope(), date = selDate();
+    var ids = {}; sc.rooms.forEach(function(r){ ids[String(r.id)] = 1; });
+    var dates = getWeekDatesUpTo(date), totPass = 0, totIssue = 0, rows = [];
+    dates.forEach(function(d){
+      var recs = (d === date) ? currentRecords : (weekCache[d] || []);
+      var by = {};
+      recs.forEach(function(r){ if (ids[String(r.roomId)]) by[String(r.roomId)] = r; });
+      var p = 0, i = 0;
+      Object.keys(by).forEach(function(k){ if (by[k].overall === "พบปัญหา") i++; else p++; });
+      totPass += p; totIssue += i;
+      rows.push([esc(thDay(d)), esc(thDate(d)), p, i, p + i]);
+    });
+    var done = totPass + totIssue, remain = Math.max(0, sc.rooms.length - done);
+    rows.push(['<b>รวมสะสม</b>', '', '<b>' + totPass + '</b>', '<b>' + totIssue + '</b>', '<b>' + done + '</b>']);
+    return head("สรุปยอดการตรวจสะสมรายสัปดาห์", "สัปดาห์ (จ.–อา.) ตั้งแต่ " + thDate(dates[0]) + " ถึง " + thDate(date), sc.label) +
+      '<div class="prkpi"><div><b>' + sc.rooms.length + '</b>ห้องทั้งหมด</div><div><b>' + totPass + '</b>ผ่าน (สะสม)</div>' +
+      '<div><b>' + totIssue + '</b>พบปัญหา (สะสม)</div><div><b>' + remain + '</b>คงเหลือ</div></div>' +
+      table([{t:"วัน"},{t:"วันที่"},{t:"ผ่าน",c:1},{t:"พบปัญหา",c:1},{t:"รวม",c:1}], rows) +
+      '<div class="prmeta">คงเหลือ = ห้องทั้งหมด − (ผ่าน + พบปัญหา สะสมตั้งแต่วันจันทร์) · ยอดนับใหม่ทุกวันจันทร์</div>' + signBlock();
+  }
+
+  var DOCS = { overdue: docOverdue, pending: docPending, done: docDone, week: docWeek };
+
+  function showMsg(t){ var m = $("prMsg"); m.textContent = t || ""; m.style.display = t ? "block" : "none"; }
+  window.prOpenMenu = function(){ showMsg(""); $("prBg").classList.add("show"); };
+  window.prCloseMenu = function(){ $("prBg").classList.remove("show"); };
+  window.prPrint = function(kind){
+    try{
+      var html = DOCS[kind]();
+      $("printArea").innerHTML = html;
+      window.prCloseMenu();
+      setTimeout(function(){ window.print(); }, 150);
+    }catch(e){
+      console.error("พิมพ์เอกสารไม่สำเร็จ", e);
+      showMsg(e && e.message ? e.message : "สร้างเอกสารไม่สำเร็จ");
+    }
+  };
+  window.addEventListener("afterprint", function(){ var a = $("printArea"); if (a) a.innerHTML = ""; });
+})();
 </script>
 </body>
 </html>
