@@ -1,0 +1,6 @@
+{
+  "floors": {
+    "3": { "image": "maps/floor-3.jpg", "pins": {} },
+    "4": { "image": "maps/floor-4.jpg", "pins": {} }
+  }
+}
