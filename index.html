@@ -283,6 +283,55 @@
   }
   a.dash-link{color:#fff;opacity:.7;font-size:12px;}
 </style>
+<style id="mapModuleStyles">
+  /* ===== โมดูลแผนที่ (เพิ่มใหม่ — ทุกชื่อขึ้นต้นด้วย map/mp เพื่อแยกจากระบบเดิม) ===== */
+  .map-open-btn{
+    width:100%;margin-top:8px;padding:12px;border:1.5px solid var(--teal);border-radius:12px;
+    background:#fff;color:var(--teal);font-family:inherit;font-weight:700;font-size:14.5px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  #mapOverlay{position:fixed;inset:0;background:var(--paper);z-index:850;display:none;flex-direction:column;
+    font-family:'Sarabun',sans-serif;color:var(--ink);}
+  #mapOverlay.show{display:flex;}
+  .mp-head{background:var(--navy);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:10px;}
+  .mp-head h2{margin:0;font-size:16px;flex:1;}
+  .mp-x{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:6px 12px;
+    font-family:inherit;font-size:14px;cursor:pointer;}
+  .mp-tabs{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--line);}
+  .mp-tab{flex:none;padding:7px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;
+    font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .mp-tab.on{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .mp-tools{display:flex;gap:6px;padding:6px 10px;align-items:center;background:#fff;flex-wrap:wrap;}
+  .mp-tools button,.mp-tools select{padding:6px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;
+    font-family:inherit;font-size:13px;cursor:pointer;}
+  .mp-tools .sp{flex:1;}
+  .mp-hint{font-size:12px;color:var(--muted);padding:0 10px 4px;background:#fff;}
+  .mp-scroll{flex:1;overflow:auto;background:#e9e6de;-webkit-overflow-scrolling:touch;position:relative;}
+  .mp-inner{position:relative;width:100%;line-height:0;}
+  .mp-inner img{width:100%;display:block;user-select:none;-webkit-user-drag:none;}
+  .mp-pin{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;
+    cursor:pointer;line-height:1.1;touch-action:none;}
+  .mp-pin .dot{width:22px;height:22px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+    background:var(--teal);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);}
+  .mp-pin .lb{margin-top:3px;background:#fff;border:1px solid var(--teal);color:var(--navy);border-radius:6px;
+    font-size:10.5px;font-weight:700;padding:1px 5px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);}
+  .mp-pin.sel .dot{background:var(--red);}
+  .mp-pin.sel .lb{border-color:var(--red);background:var(--red-light);}
+  .mp-pin.edit .dot{background:var(--amber);}
+  .mp-bar{background:#fff;border-top:1px solid var(--line);padding:10px 12px;max-height:38vh;overflow:auto;}
+  .mp-sel{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .mp-sel .t{flex:1;font-weight:700;font-size:14.5px;}
+  .mp-sel .t small{display:block;font-weight:400;color:var(--muted);font-size:12px;}
+  .mp-go{background:var(--teal);color:#fff;border:none;border-radius:10px;padding:10px 16px;font-family:inherit;
+    font-weight:700;font-size:14px;cursor:pointer;}
+  .mp-go:disabled{background:#b9c5c3;cursor:default;}
+  .mp-list{display:flex;flex-wrap:wrap;gap:6px;}
+  .mp-chip{padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;font-family:inherit;
+    font-size:12.5px;cursor:pointer;}
+  .mp-chip.nopin{border-style:dashed;color:var(--muted);}
+  .mp-chip.on{border-color:var(--red);background:var(--red-light);}
+  .mp-empty{padding:30px 16px;text-align:center;color:var(--muted);line-height:1.6;}
+</style>
 </head>
 <body>
 
@@ -941,6 +990,292 @@ async function retryPendingSync(){
 
 init();
 retryPendingSync();
+</script>
+<!-- ===== โมดูลแผนที่: หน้าจอแผนที่เลือกห้อง (ซ่อนไว้จนกดปุ่ม "แผนที่") ===== -->
+<div id="mapOverlay"></div>
+
+<script id="mapModule">
+// ============================================================
+// โมดูลแผนที่เลือกห้อง — เพิ่มใหม่ แยกจากโค้ดเดิม
+// - เพิ่มปุ่ม "แผนที่" ใต้ปุ่มสแกน QR ในหน้าเลือกห้อง (ไม่แก้ renderPicker เดิม)
+// - เลือกห้องแล้วไปหน้าตรวจด้วยวิธีเดียวกับรายการห้องเดิม (?room=รหัสห้อง)
+// - ไม่เขียนข้อมูลลง localStorage ตอนใช้งานปกติ (ไม่กระทบพื้นที่เก็บรายการตรวจ)
+// - โหมดจัดวางหมุด: เปิดหน้าด้วย ?mapedit=1
+// ============================================================
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+
+  // ผังที่มีอยู่ตอนนี้ (ชั้นอื่นเพิ่มได้ใน maps/maps.json โดยไม่ต้องแก้โค้ด)
+  var DEFAULT_FLOORS = { "3": {image: "maps/floor-3.jpg"}, "4": {image: "maps/floor-4.jpg"} };
+  var MAPS_URL = "maps/maps.json";
+  var DRAFT_KEY = "5s_map_pins_draft_v1";
+
+  var params = new URLSearchParams(location.search);
+  var S = { edit: params.get("mapedit") === "1", floors: {}, pins: {}, floor: null, sel: null, editRoom: null, zoom: 1, loaded: false };
+
+  function isTransport(r){ return String(r.name).indexOf("ขนส่ง") >= 0; }   // ห้องขนส่งไม่ทำแผนที่
+  function roomsOn(f){ return ROOMS.filter(function(r){ return String(r.floor) === String(f) && !isTransport(r); }); }
+  function shortName(r){
+    var n = String(r.name).replace(/\s*\(.*?\)\s*/g," ").replace(/^ห้อง\s*/,"").replace("ปรับอากาศ","แอร์").replace(/\s+/g," ").trim();
+    return n || r.name;
+  }
+  function toast(m,t){ if (typeof showToast === "function") showToast(m,t); }
+
+  function readDraft(){ try{ return JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); }catch(e){ return null; } }
+  function saveDraft(){ try{ localStorage.setItem(DRAFT_KEY, JSON.stringify({pins: S.pins})); }catch(e){} }
+
+  function floorOrder(){
+    var all = []; ROOMS.forEach(function(r){ if (all.indexOf(String(r.floor)) < 0) all.push(String(r.floor)); });
+    return all.filter(function(f){ return S.floors[f] && S.floors[f].image; });
+  }
+
+  function loadMaps(){
+    S.floors = JSON.parse(JSON.stringify(DEFAULT_FLOORS)); S.pins = {};
+    return fetch(MAPS_URL + "?_=" + Date.now(), {cache: "no-store"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; })
+      .then(function(d){
+        if (d && d.floors){
+          Object.keys(d.floors).forEach(function(f){
+            S.floors[f] = S.floors[f] || {};
+            if (d.floors[f].image) S.floors[f].image = d.floors[f].image;
+            S.pins[f] = d.floors[f].pins || {};
+          });
+        }
+        if (S.edit){ var dr = readDraft(); if (dr && dr.pins) S.pins = dr.pins; }
+        S.loaded = true;
+      });
+  }
+
+  // ---------- โครงหน้าจอ ----------
+  function build(){
+    var ov = $("mapOverlay");
+    ov.innerHTML =
+      '<div class="mp-head"><h2>🗺️ แผนที่เลือกห้อง' + (S.edit ? ' · โหมดจัดวางหมุด' : '') + '</h2><button class="mp-x" id="mpClose">✕ ปิด</button></div>' +
+      '<div class="mp-tabs" id="mpTabs"></div>' +
+      '<div class="mp-tools" id="mpTools"></div>' +
+      '<div class="mp-hint" id="mpHint"></div>' +
+      '<div class="mp-scroll" id="mpScroll"><div class="mp-inner" id="mpInner"><img id="mpImg" alt="ผังชั้น"></div></div>' +
+      '<div class="mp-bar" id="mpBar"></div>';
+    $("mpClose").onclick = closeMap;
+    $("mpInner").addEventListener("click", onInnerClick);
+    var fl = floorOrder();
+    if (!fl.length){
+      $("mpScroll").innerHTML = '<div class="mp-empty">ยังไม่มีผังชั้นในระบบ</div>';
+      return;
+    }
+    if (!S.floor || fl.indexOf(S.floor) < 0) S.floor = fl[0];
+    renderTabs(); renderTools(); setFloor(S.floor);
+  }
+
+  function renderTabs(){
+    $("mpTabs").innerHTML = floorOrder().map(function(f){
+      return '<button class="mp-tab' + (f === S.floor ? ' on' : '') + '" data-f="' + esc(f) + '">ชั้น ' + esc(f) + '</button>';
+    }).join("");
+    Array.prototype.forEach.call($("mpTabs").querySelectorAll(".mp-tab"), function(b){
+      b.onclick = function(){ setFloor(b.getAttribute("data-f")); };
+    });
+  }
+
+  function renderTools(){
+    var h = '<button id="mpZm">−</button><button id="mpZp">＋</button><button id="mpZr">รีเซ็ต</button><span class="sp"></span>';
+    if (S.edit){
+      h = '<select id="mpEditSel"></select><button id="mpDel">🗑️ ลบหมุด</button><span class="sp"></span>' +
+          '<button id="mpZm">−</button><button id="mpZp">＋</button><button id="mpZr">รีเซ็ต</button>' +
+          '<button id="mpCopy">📋 คัดลอก maps.json</button><button id="mpDl">💾 ดาวน์โหลด</button>';
+    }
+    $("mpTools").innerHTML = h;
+    $("mpZm").onclick = function(){ zoomTo(S.zoom - 0.5); };
+    $("mpZp").onclick = function(){ zoomTo(S.zoom + 0.5); };
+    $("mpZr").onclick = function(){ zoomTo(1); };
+    if (S.edit){
+      $("mpEditSel").onchange = function(){ S.editRoom = this.value || null; renderPins(); renderBar(); };
+      $("mpDel").onclick = function(){ if (S.editRoom && S.pins[S.floor]){ delete S.pins[S.floor][S.editRoom]; saveDraft(); refreshEdit(); } };
+      $("mpCopy").onclick = function(){
+        copyText(exportJson()).then(function(){ toast("คัดลอก maps.json แล้ว — นำไปวางแทนไฟล์ maps/maps.json ใน GitHub","ok"); },
+                                    function(){ toast("คัดลอกไม่สำเร็จ ลองกดดาวน์โหลดแทน","err"); });
+      };
+      $("mpDl").onclick = function(){
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([exportJson()], {type: "application/json"}));
+        a.download = "maps.json"; document.body.appendChild(a); a.click(); a.remove();
+      };
+    }
+    $("mpHint").textContent = S.edit
+      ? "เลือกห้องจากรายการ แล้วแตะตำแหน่งบนผังเพื่อวางหมุด · ลากหมุดเพื่อย้าย · เสร็จแล้วกด \"คัดลอก\" หรือ \"ดาวน์โหลด\" maps.json ไปอัปโหลดที่ GitHub (โฟลเดอร์ maps/)"
+      : "แตะหมุดที่ห้องที่ต้องการ แล้วกด \"เริ่มตรวจ\" · ใช้ปุ่ม ＋ − เพื่อขยายผัง";
+    $("mpHint").style.display = "block";
+  }
+
+  function zoomTo(z){
+    S.zoom = Math.max(1, Math.min(4, z));
+    $("mpInner").style.width = (S.zoom * 100) + "%";
+  }
+
+  function setFloor(f){
+    S.floor = String(f); S.sel = null; S.zoom = 1;
+    var rooms = roomsOn(S.floor);
+    if (S.edit){
+      var pins = S.pins[S.floor] || {};
+      var firstFree = rooms.filter(function(r){ return !pins[r.id]; })[0];
+      S.editRoom = String((firstFree || rooms[0] || {}).id || "") || null;
+    }
+    renderTabs();
+    $("mpInner").style.width = "100%";
+    $("mpImg").src = S.floors[S.floor].image;
+    $("mpScroll").scrollTop = 0; $("mpScroll").scrollLeft = 0;
+    if (S.edit) fillEditSel();
+    renderPins(); renderBar();
+  }
+
+  function fillEditSel(){
+    var pins = S.pins[S.floor] || {};
+    $("mpEditSel").innerHTML = roomsOn(S.floor).map(function(r){
+      return '<option value="' + r.id + '"' + (String(r.id) === String(S.editRoom) ? ' selected' : '') + '>' +
+        (pins[r.id] ? '✓ ' : '• ') + esc(r.name) + '</option>';
+    }).join("");
+  }
+  function refreshEdit(){ fillEditSel(); renderPins(); renderBar(); }
+
+  // ---------- หมุด ----------
+  function renderPins(){
+    var inner = $("mpInner");
+    Array.prototype.forEach.call(inner.querySelectorAll(".mp-pin"), function(n){ n.remove(); });
+    var pins = S.pins[S.floor] || {};
+    roomsOn(S.floor).forEach(function(r){
+      var p = pins[r.id]; if (!p) return;
+      var el = document.createElement("div");
+      el.className = "mp-pin" + (String(S.sel) === String(r.id) ? " sel" : "") + (S.edit ? " edit" : "");
+      if (S.edit && String(S.editRoom) === String(r.id)) el.className += " sel";
+      el.style.left = p.x + "%"; el.style.top = p.y + "%";
+      el.style.zIndex = (el.className.indexOf("sel") >= 0) ? 5 : 1;
+      el.innerHTML = '<div class="dot"></div><div class="lb">' + esc(shortName(r)) + '</div>';
+      bindPin(el, r.id);
+      inner.appendChild(el);
+    });
+  }
+
+  function posFromEvent(e){
+    var rc = $("mpInner").getBoundingClientRect();
+    var x = (e.clientX - rc.left) / rc.width * 100, y = (e.clientY - rc.top) / rc.height * 100;
+    return { x: Math.round(Math.max(0, Math.min(100, x)) * 100) / 100, y: Math.round(Math.max(0, Math.min(100, y)) * 100) / 100 };
+  }
+
+  function bindPin(el, id){
+    var drag = null;
+    el.addEventListener("click", function(e){
+      e.stopPropagation();
+      if (!S.edit) selectRoom(id);
+    });
+    if (!S.edit) return;
+    el.addEventListener("pointerdown", function(e){
+      e.preventDefault(); e.stopPropagation();
+      try{ el.setPointerCapture(e.pointerId); }catch(x){}
+      drag = { moved: false, p: null };
+    });
+    el.addEventListener("pointermove", function(e){
+      if (!drag) return;
+      drag.moved = true; drag.p = posFromEvent(e);
+      el.style.left = drag.p.x + "%"; el.style.top = drag.p.y + "%";
+    });
+    el.addEventListener("pointerup", function(e){
+      if (!drag) return;
+      if (drag.moved && drag.p){ S.pins[S.floor] = S.pins[S.floor] || {}; S.pins[S.floor][id] = drag.p; saveDraft(); }
+      else { S.editRoom = String(id); }
+      drag = null; refreshEdit();
+    });
+  }
+
+  function onInnerClick(e){
+    if (!S.edit){ return; }
+    if (e.target.closest && e.target.closest(".mp-pin")) return;
+    if (!S.editRoom){ toast("เลือกห้องจากรายการด้านบนก่อน","err"); return; }
+    var p = posFromEvent(e);
+    S.pins[S.floor] = S.pins[S.floor] || {};
+    S.pins[S.floor][S.editRoom] = p;
+    saveDraft();
+    // เลื่อนไปห้องถัดไปที่ยังไม่ปักหมุด เพื่อวางต่อได้เร็ว
+    var rooms = roomsOn(S.floor), pins = S.pins[S.floor];
+    var next = rooms.filter(function(r){ return !pins[r.id]; })[0];
+    if (next) S.editRoom = String(next.id);
+    refreshEdit();
+  }
+
+  // ---------- แถบด้านล่าง ----------
+  function selectRoom(id){ S.sel = String(id); renderPins(); renderBar(); }
+
+  function renderBar(){
+    var rooms = roomsOn(S.floor), pins = S.pins[S.floor] || {}, bar = $("mpBar"), h = "";
+    if (S.edit){
+      var placed = rooms.filter(function(r){ return pins[r.id]; }).length;
+      h += '<div class="mp-sel"><div class="t">ชั้น ' + esc(S.floor) + ' · ปักหมุดแล้ว ' + placed + '/' + rooms.length + ' ห้อง<small>แตะชื่อห้องเพื่อเลือก แล้วแตะบนผังเพื่อวาง</small></div></div>';
+    } else {
+      var r = rooms.filter(function(x){ return String(x.id) === String(S.sel); })[0];
+      h += '<div class="mp-sel"><div class="t">' + (r ? esc(r.name) + '<small>ชั้น ' + esc(r.floor) + ' · โซน ' + esc(r.zone) + (pins[r.id] ? '' : ' · ยังไม่ปักหมุดบนผัง') + '</small>' : 'แตะหมุดบนผังเพื่อเลือกห้อง<small>หรือเลือกจากรายการด้านล่าง</small>') + '</div>' +
+           '<button class="mp-go" id="mpGo"' + (r ? '' : ' disabled') + '>เริ่มตรวจ →</button></div>';
+    }
+    h += '<div class="mp-list">' + rooms.map(function(x){
+      var on = S.edit ? String(x.id) === String(S.editRoom) : String(x.id) === String(S.sel);
+      return '<button class="mp-chip' + (pins[x.id] ? '' : ' nopin') + (on ? ' on' : '') + '" data-id="' + x.id + '">' + esc(x.name) + '</button>';
+    }).join("") + '</div>';
+    bar.innerHTML = h;
+    Array.prototype.forEach.call(bar.querySelectorAll(".mp-chip"), function(c){
+      c.onclick = function(){
+        var id = c.getAttribute("data-id");
+        if (S.edit){ S.editRoom = id; fillEditSel(); renderPins(); renderBar(); }
+        else selectRoom(id);
+      };
+    });
+    var go = $("mpGo");
+    if (go) go.onclick = function(){ if (S.sel) location.href = "?room=" + S.sel; };
+  }
+
+  // ---------- ส่งออก maps.json ----------
+  function exportJson(){
+    var out = { floors: {} };
+    Object.keys(S.floors).forEach(function(f){
+      var pins = {};
+      var src = S.pins[f] || {};
+      Object.keys(src).sort(function(a,b){ return a - b; }).forEach(function(id){ pins[id] = { x: src[id].x, y: src[id].y }; });
+      out.floors[f] = { image: S.floors[f].image, pins: pins };
+    });
+    return JSON.stringify(out, null, 2);
+  }
+  function copyText(t){
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+    return new Promise(function(res, rej){
+      var ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand("copy"); res(); }catch(e){ rej(e); }
+      ta.remove();
+    });
+  }
+
+  // ---------- เปิด/ปิด ----------
+  function openMap(){
+    var ov = $("mapOverlay");
+    ov.classList.add("show"); document.body.style.overflow = "hidden";
+    ov.innerHTML = '<div class="mp-empty">กำลังโหลดแผนที่...</div>';
+    loadMaps().then(build);
+  }
+  function closeMap(){ $("mapOverlay").classList.remove("show"); document.body.style.overflow = ""; }
+  window.mapOpen = openMap;
+
+  // ---------- ใส่ปุ่มในหน้าเลือกห้อง (ไม่แก้ renderPicker เดิม) ----------
+  function injectBtn(){
+    var scan = $("scanQrBtn");
+    if (!scan || $("mapOpenBtn")) return;
+    var b = document.createElement("button");
+    b.type = "button"; b.id = "mapOpenBtn"; b.className = "map-open-btn"; b.textContent = "🗺️ แผนที่ (เลือกห้องจากผังชั้น)";
+    b.addEventListener("click", openMap);
+    scan.insertAdjacentElement("afterend", b);
+  }
+  var app = $("app");
+  if (app && window.MutationObserver) new MutationObserver(injectBtn).observe(app, { childList: true, subtree: true });
+  injectBtn();
+  if (S.edit) openMap();
+})();
 </script>
 </body>
 </html>
